@@ -239,6 +239,49 @@ jobs:
 #          name: ${{ env.ARTIFACT_NAME }}.pkg
 #          path: packaging/${{ env.ARTIFACT_NAME }}.pkg
 
+  clang_tidy:
+    name: clang-tidy
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang clang-tidy \
+            libasound2-dev libx11-dev libxinerama-dev libxext-dev \
+            libfreetype6-dev libwebkit2gtk-4.1-dev libglu1-mesa-dev \
+            ninja-build
+
+      - name: Configure
+        run: |
+          cmake -B ${{ env.BUILD_DIR }} \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            .
+
+      - name: Run clang-tidy
+        uses: cpp-linter/cpp-linter-action@v2
+        id: linter
+        continue-on-error: true
+        with:
+          style: ''                          # skip clang-format, tidy only
+          tidy-checks: ''                    # defer to your .clang-tidy file
+          database: ${{ env.BUILD_DIR }}     # where compile_commands.json lives
+          sources: 'source/'                 # only lint your code, not JUCE
+          lines-changed-only: true           # on PRs, only annotate touched lines
+          thread-comments: true              # post inline PR review comments
+          job-summary: true                  # post a summary table to the job
+
   release:
     if: contains(github.ref, 'tags/v')
     runs-on: ubuntu-latest
