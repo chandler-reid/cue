@@ -11,6 +11,13 @@ The template provides the build system, CI/CD, and project structure. The plugin
 ## Build Commands
 
 ```bash
+# Build the web UI first: CMake embeds ui/dist and fails to configure without it.
+# Re-run after UI changes; the next cmake --build re-embeds the bundle.
+(cd ui && npm ci && npm run build)
+
+# UI-only development against a mock backend (no C++ needed)
+(cd ui && npm run dev)
+
 # Configure (run once, or after CMakeLists.txt changes)
 cmake -B Builds -DCMAKE_BUILD_TYPE=Release
 
@@ -36,7 +43,10 @@ On macOS for universal binary: `-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"`
 
 ## Project Structure
 
-- `source/` - Plugin source code (PluginProcessor, PluginEditor)
+- `source/` - Plugin source code (PluginProcessor, PluginEditor, NoteBridge, WebUIResources)
+- `ui/` - Preact + TypeScript web UI (Vite). `ui/src/bridge.ts` is the only module that talks to JUCE
+- `docs/adr/` - Architecture Decision Records
+- `DEVLOG.md` - Status, verification and next steps
 - `tests/` - Catch2 test files
 - `benchmarks/` - Catch2 benchmark files
 - `cmake/` - CMake modules (Tests.cmake, Benchmarks.cmake, Assets.cmake, etc.)

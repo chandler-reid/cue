@@ -67,6 +67,9 @@ juce_add_plugin("${PROJECT_NAME}"
     # Icons for the standalone app
     ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icon.png"
 
+    # The UI is a web app in a WebBrowserComponent (see docs/adr/0001)
+    NEEDS_WEB_BROWSER TRUE
+
     # Change me!
     COMPANY_NAME "${COMPANY_NAME}"
     BUNDLE_ID "${BUNDLE_ID}"
@@ -114,6 +117,17 @@ target_sources(SharedCode INTERFACE ${SourceFiles})
 # Adds a BinaryData target for embedding assets into the binary
 include(Assets)
 
+# The built web UI (ui/dist) is embedded into the binary and served to the
+# WebBrowserComponent by a resource provider (see source/WebUIResources.cpp).
+# Build it first: cd ui && npm ci && npm run build
+set(WEB_UI_DIST "${CMAKE_CURRENT_SOURCE_DIR}/ui/dist")
+if (NOT EXISTS "${WEB_UI_DIST}/index.html")
+    message(FATAL_ERROR "Web UI bundle not found at ${WEB_UI_DIST}. Run: cd ui && npm ci && npm run build")
+endif ()
+file(GLOB_RECURSE WebUIFiles CONFIGURE_DEPENDS "${WEB_UI_DIST}/*")
+juce_add_binary_data(WebUIAssets HEADER_NAME WebUIData.h NAMESPACE WebUIData SOURCES ${WebUIFiles})
+set_target_properties(WebUIAssets PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+
 # MacOS only: Cleans up folder and target organization on Xcode.
 include(XcodePrettify)
 
@@ -122,7 +136,7 @@ target_compile_definitions(SharedCode
     INTERFACE
 
     # JUCE_WEB_BROWSER and JUCE_USE_CURL off by default
-    JUCE_WEB_BROWSER=0  # If you set this to 1, add `NEEDS_WEB_BROWSER TRUE` to the `juce_add_plugin` call
+    JUCE_WEB_BROWSER=1  # Requires `NEEDS_WEB_BROWSER TRUE` in the `juce_add_plugin` call
     JUCE_USE_CURL=0     # If you set this to 1, add `NEEDS_CURL TRUE` to the `juce_add_plugin` call
     JUCE_VST3_CAN_REPLACE_VST2=0
 
@@ -145,6 +159,7 @@ target_compile_definitions(SharedCode
 target_link_libraries(SharedCode
     INTERFACE
     Assets
+    WebUIAssets
     melatonin_inspector
     juce_audio_utils
     juce_audio_processors
@@ -154,6 +169,13 @@ target_link_libraries(SharedCode
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
+
+# NEEDS_WEB_BROWSER only adds the GTK/WebKit include paths to the plugin target.
+# Tests and Benchmarks compile the same JUCE modules via SharedCode, so they need them too.
+# (NOLINK target: include paths only, JUCE loads WebKit at runtime.)
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(SharedCode INTERFACE juce::pkgconfig_JUCE_BROWSER_LINUX_DEPS)
+endif ()
 
 # Link the JUCE plugin targets our SharedCode target
 target_link_libraries("${PROJECT_NAME}" PRIVATE SharedCode)
@@ -166,6 +188,14 @@ include(Tests)
 
 # A separate target for Benchmarks (keeps the Tests target fast)
 include(Benchmarks)
+
+# On Linux, plugin targets embed a helper executable that hosts WebKit out of
+# process. Tests and Benchmarks inherit the plugin's compile definitions, so
+# they need the same embedded helper to compile.
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    juce_link_with_embedded_linux_subprocess(Tests)
+    juce_link_with_embedded_linux_subprocess(Benchmarks)
+endif ()
 
 # Output some config for CI (like our PRODUCT_NAME)
 include(GitHubENV)
