@@ -16,6 +16,11 @@ TEST_CASE ("Boot performance")
         meter.measure ([&] (int i) { storage[(size_t) i].destruct(); });
     };
 
+    // Skipped on Linux: the editor hosts a WebBrowserComponent, which on Linux
+    // runs WebKit in a helper process that dlopen()s the current binary. That
+    // works for the plugin (a shared library) but not for this executable, so
+    // the helper exits and the editor dies with SIGPIPE. Not a plugin bug.
+#if !JUCE_LINUX
     BENCHMARK_ADVANCED ("Editor open and close")
     (Catch::Benchmark::Chronometer meter)
     {
@@ -29,4 +34,5 @@ TEST_CASE ("Boot performance")
             return plugin.getActiveEditor();
         });
     };
+#endif
 }

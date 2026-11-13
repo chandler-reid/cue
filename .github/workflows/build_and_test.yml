@@ -87,6 +87,21 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      # CMake embeds ui/dist into the plugin, so the UI must be built before Configure
+      - name: Build web UI
+        working-directory: ui
+        run: |
+          npm ci
+          npm audit --audit-level=high
+          npm run build
+
       - name: Cache the build
         uses: mozilla-actions/sccache-action@v0.0.9
 
