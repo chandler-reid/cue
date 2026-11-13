@@ -1,0 +1,29 @@
+{
+  "name": "Cue",
+  "build": { "dockerfile": "Dockerfile" },
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "24" }
+  },
+  "hostRequirements": { "cpus": 4 },
+  "postCreateCommand": "git submodule update --init --recursive && cd ui && npm ci && npm run build",
+  "forwardPorts": [5173],
+  "portsAttributes": {
+    "5173": { "label": "UI dev server (Vite)" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "llvm-vs-code-extensions.vscode-clangd",
+        "ms-vscode.cmake-tools",
+        "vadimcn.vscode-lldb"
+      ],
+      "settings": {
+        "cmake.generator": "Ninja",
+        "cmake.buildDirectory": "${workspaceFolder}/Builds",
+        "cmake.configureSettings": { "CMAKE_EXPORT_COMPILE_COMMANDS": "ON" },
+        "clangd.arguments": ["--compile-commands-dir=${workspaceFolder}/Builds"],
+        "C_Cpp.intelliSenseEngine": "disabled"
+      }
+    }
+  }
+}
